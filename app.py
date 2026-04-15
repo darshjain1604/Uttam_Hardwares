@@ -1,32 +1,32 @@
 from flask import Flask, render_template, request, redirect, session, send_file, abort
-import sqlite3
+import psycopg2
+import os
 import qrcode
 import pandas as pd
-import os
 
 app = Flask(__name__)
 app.secret_key = "secret123"
 
-
 # ---------------- DATABASE ----------------
 
 def get_db():
-    conn = sqlite3.connect("database.db")
-    return conn
+    return psycopg2.connect(os.environ.get("DATABASE_URL"))
 
 
 @app.route("/init_db")
 def init_db():
     conn = get_db()
-    conn.execute("""
+    cur = conn.cursor()
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         price INTEGER NOT NULL,
         unit TEXT NOT NULL
     )
     """)
     conn.commit()
+    cur.close()
     conn.close()
     return "Database Ready!"
 
@@ -38,24 +38,32 @@ def home():
     return render_template("cart.html", cart=session.get("cart", []))
 
 
-# ---------------- PRODUCTS LIST ----------------
+# ---------------- PRODUCT LIST ----------------
 
 @app.route("/products")
 def product_list():
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM products ORDER BY id DESC")
-    rows = cur.fetchall()
-    conn.close()
 
-    products = []
-    for row in rows:
-        products.append({
-            "id": row[0],
-            "name": row[1],
-            "price": row[2],
-            "unit": row[3]
-        })
+    try:
+        cur.execute("SELECT id, name, price, unit FROM products")
+        rows = cur.fetchall()
+
+        products = []
+        for row in rows:
+            products.append({
+                "id": row[0],
+                "name": row[1],
+                "price": row[2],
+                "unit": row[3]
+            })
+
+    except Exception as e:
+        return f"Error: {e}"
+
+    finally:
+        cur.close()
+        conn.close()
 
     return render_template("products.html", products=products)
 
@@ -66,8 +74,9 @@ def product_list():
 def product(pid):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM products WHERE id=?", (pid,))
+    cur.execute("SELECT * FROM products WHERE id=%s", (pid,))
     row = cur.fetchone()
+    cur.close()
     conn.close()
 
     if not row:
@@ -83,29 +92,23 @@ def product(pid):
     return render_template("product.html", product=product)
 
 
-# ---------------- ADD PRODUCT (ADMIN) ----------------
+# ---------------- ADD PRODUCT ----------------
 
 @app.route("/add_product", methods=["GET", "POST"])
 def add_product():
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        price = request.form.get("price", "").strip()
-        unit = request.form.get("unit", "").strip()
-
-        if not name or not price or not unit:
-            return "All fields are required", 400
-
-        try:
-            price = int(price)
-        except ValueError:
-            return "Price must be a number", 400
+        name = request.form.get("name")
+        price = request.form.get("price")
+        unit = request.form.get("unit")
 
         conn = get_db()
-        conn.execute(
-            "INSERT INTO products (name, price, unit) VALUES (?, ?, ?)",
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO products (name, price, unit) VALUES (%s, %s, %s)",
             (name, price, unit)
         )
         conn.commit()
+        cur.close()
         conn.close()
 
         return "Product Added Successfully!"
@@ -117,23 +120,17 @@ def add_product():
 
 @app.route("/add_to_cart/<int:pid>", methods=["POST"])
 def add_to_cart(pid):
-    qty = request.form.get("qty", "1").strip()
-
-    try:
-        qty = int(qty)
-        if qty < 1:
-            raise ValueError
-    except ValueError:
-        return "Quantity must be a positive number", 400
+    qty = int(request.form.get("qty", 1))
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM products WHERE id=?", (pid,))
+    cur.execute("SELECT * FROM products WHERE id=%s", (pid,))
     row = cur.fetchone()
+    cur.close()
     conn.close()
 
     if not row:
-        return "Product not found", 404
+        return "Product not found"
 
     product = {
         "id": row[0],
@@ -160,14 +157,11 @@ def add_to_cart(pid):
     return redirect("/")
 
 
-# ---------------- EXPORT TO EXCEL ----------------
+# ---------------- EXPORT EXCEL ----------------
 
 @app.route("/export_excel")
 def export_excel():
     cart = session.get("cart", [])
-
-    if not cart:
-        return "Cart is empty", 400
 
     data = []
     for item in cart:
@@ -179,10 +173,10 @@ def export_excel():
         })
 
     df = pd.DataFrame(data)
-    file_path = "bill.xlsx"
-    df.to_excel(file_path, index=False)
+    file = "bill.xlsx"
+    df.to_excel(file, index=False)
 
-    return send_file(file_path, as_attachment=True)
+    return send_file(file, as_attachment=True)
 
 
 # ---------------- CLEAR CART ----------------
@@ -201,14 +195,13 @@ def generate_qr(pid):
     url = f"{base_url}/product/{pid}"
 
     img = qrcode.make(url)
-    qr_path = f"static/qr_codes/product_{pid}.png"
-    img.save(qr_path)
+    img.save(f"static/qr_codes/product_{pid}.png")
 
-    return f"QR created successfully for product {pid}"
+    return "QR created!"
 
 
-# ---------------- RUN APP ----------------
+# ---------------- RUN ----------------
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port)
