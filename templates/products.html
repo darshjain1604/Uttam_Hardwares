@@ -1,26 +1,25 @@
-@app.route("/products")
-def product_list():
-    conn = get_db()
-    cur = conn.cursor()
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Products</title>
+</head>
+<body>
 
-    try:
-        cur.execute("SELECT id, name, price, unit FROM products")
-        rows = cur.fetchall()
+<h1>All Products</h1>
 
-        products = []
-        for row in rows:
-            products.append({
-                "id": row[0],
-                "name": row[1],
-                "price": row[2],
-                "unit": row[3]
-            })
+{% if products %}
+  {% for p in products %}
+    <div>
+      <h3>{{ p.name }}</h3>
+      <p>Price: ₹{{ p.price }}</p>
+      <p>Unit: {{ p.unit }}</p>
+      <a href="/product/{{ p.id }}">View</a>
+    </div>
+    <hr>
+  {% endfor %}
+{% else %}
+  <p>No products available</p>
+{% endif %}
 
-        return render_template("products.html", products=products)
-
-    except Exception as e:
-        return f"ERROR: {e}"
-
-    finally:
-        cur.close()
-        conn.close()
+</body>
+</html>
