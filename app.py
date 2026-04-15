@@ -165,3 +165,21 @@ def generate_qr(pid):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+@app.route("/products")
+def product_list():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM products")
+    rows = cur.fetchall()
+    conn.close()
+
+    products = []
+    for row in rows:
+        products.append({
+            "id": row[0],
+            "name": row[1],
+            "price": row[2],
+            "unit": row[3]
+        })
+
+    return render_template("products.html", products=products)
