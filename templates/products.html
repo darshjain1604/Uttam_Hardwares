@@ -1,10 +1,26 @@
-<h1>{{ product.name }}</h1>
+@app.route("/products")
+def product_list():
+    conn = get_db()
+    cur = conn.cursor()
 
-<p>Price: ₹{{ product.price }}</p>
+    try:
+        cur.execute("SELECT id, name, price, unit FROM products")
+        rows = cur.fetchall()
 
-<form action="/add_to_cart/{{ product.id }}" method="POST">
-  <input type="number" name="qty" value="1">
-  <button>Add to Cart</button>
-</form>
+        products = []
+        for row in rows:
+            products.append({
+                "id": row[0],
+                "name": row[1],
+                "price": row[2],
+                "unit": row[3]
+            })
 
-<a href="/">Go to Cart</a>
+        return render_template("products.html", products=products)
+
+    except Exception as e:
+        return f"ERROR: {e}"
+
+    finally:
+        cur.close()
+        conn.close()
