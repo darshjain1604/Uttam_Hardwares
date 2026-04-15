@@ -1,11 +1,13 @@
 from flask import Flask, render_template, request, redirect, session, send_file, abort
 import psycopg2
 import os
-import qrcode
 import pandas as pd
 
 app = Flask(__name__)
 app.secret_key = "secret123"
+
+ADMIN_PASS = "1234"  # 🔐 change this password
+
 
 # ---------------- DATABASE ----------------
 
@@ -17,55 +19,129 @@ def get_db():
 def init_db():
     conn = get_db()
     cur = conn.cursor()
+
     cur.execute("""
     CREATE TABLE IF NOT EXISTS products (
         id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        price INTEGER NOT NULL,
-        unit TEXT NOT NULL
+        name TEXT,
+        price INTEGER,
+        unit TEXT,
+        image TEXT,
+        stock INTEGER
     )
     """)
+
     conn.commit()
     cur.close()
     conn.close()
+
     return "Database Ready!"
 
 
-# ---------------- HOME (CART) ----------------
+# ---------------- LOGIN ----------------
 
-@app.route("/")
-def home():
-    return render_template("cart.html", cart=session.get("cart", []))
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        if request.form.get("password") == ADMIN_PASS:
+            session["admin"] = True
+            return redirect("/products")
+        else:
+            return "Wrong Password!"
+
+    return render_template("login.html")
 
 
-# ---------------- PRODUCT LIST ----------------
+@app.route("/logout")
+def logout():
+    session.pop("admin", None)
+    return redirect("/login")
+
+
+# ---------------- ADMIN PRODUCT LIST ----------------
 
 @app.route("/products")
 def product_list():
+    if not session.get("admin"):
+        return redirect("/login")
+
     conn = get_db()
     cur = conn.cursor()
+    cur.execute("SELECT id, name, price, unit, image, stock FROM products")
+    rows = cur.fetchall()
 
-    try:
-        cur.execute("SELECT id, name, price, unit FROM products")
-        rows = cur.fetchall()
+    cur.close()
+    conn.close()
 
-        products = []
-        for row in rows:
-            products.append({
-                "id": row[0],
-                "name": row[1],
-                "price": row[2],
-                "unit": row[3]
-            })
+    products = []
+    for row in rows:
+        products.append({
+            "id": row[0],
+            "name": row[1],
+            "price": row[2],
+            "unit": row[3],
+            "image": row[4],
+            "stock": row[5]
+        })
 
-    except Exception as e:
-        return f"Error: {e}"
+    return render_template("products.html", products=products)
 
-    finally:
+
+# ---------------- ADD PRODUCT ----------------
+
+@app.route("/add_product", methods=["GET", "POST"])
+def add_product():
+    if not session.get("admin"):
+        return redirect("/login")
+
+    if request.method == "POST":
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute(
+            "INSERT INTO products (name, price, unit, image, stock) VALUES (%s, %s, %s, %s, %s)",
+            (
+                request.form["name"],
+                request.form["price"],
+                request.form["unit"],
+                request.form["image"],
+                request.form["stock"]
+            )
+        )
+
+        conn.commit()
         cur.close()
         conn.close()
 
-    return render_template("products.html", products=products)
+        return "Product Added Successfully!"
+
+    return render_template("add_product.html")
+
+
+# ---------------- CUSTOMER SHOP PAGE ----------------
+
+@app.route("/shop")
+def shop():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, name, price, unit, image, stock FROM products")
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    products = []
+    for row in rows:
+        products.append({
+            "id": row[0],
+            "name": row[1],
+            "price": row[2],
+            "unit": row[3],
+            "image": row[4],
+            "stock": row[5]
+        })
+
+    return render_template("shop.html", products=products)
 
 
 # ---------------- PRODUCT PAGE ----------------
@@ -74,8 +150,9 @@ def product_list():
 def product(pid):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM products WHERE id=%s", (pid,))
+    cur.execute("SELECT id, name, price, unit, image, stock FROM products WHERE id=%s", (pid,))
     row = cur.fetchone()
+
     cur.close()
     conn.close()
 
@@ -86,34 +163,12 @@ def product(pid):
         "id": row[0],
         "name": row[1],
         "price": row[2],
-        "unit": row[3]
+        "unit": row[3],
+        "image": row[4],
+        "stock": row[5]
     }
 
     return render_template("product.html", product=product)
-
-
-# ---------------- ADD PRODUCT ----------------
-
-@app.route("/add_product", methods=["GET", "POST"])
-def add_product():
-    if request.method == "POST":
-        name = request.form.get("name")
-        price = request.form.get("price")
-        unit = request.form.get("unit")
-
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO products (name, price, unit) VALUES (%s, %s, %s)",
-            (name, price, unit)
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        return "Product Added Successfully!"
-
-    return render_template("add_product.html")
 
 
 # ---------------- ADD TO CART ----------------
@@ -124,19 +179,24 @@ def add_to_cart(pid):
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM products WHERE id=%s", (pid,))
+    cur.execute("SELECT id, name, price, image, stock FROM products WHERE id=%s", (pid,))
     row = cur.fetchone()
+
     cur.close()
     conn.close()
 
     if not row:
         return "Product not found"
 
+    if qty > row[4]:
+        return "Not enough stock!"
+
     product = {
         "id": row[0],
         "name": row[1],
         "price": row[2],
-        "unit": row[3]
+        "image": row[3],
+        "stock": row[4]
     }
 
     cart = session.get("cart", [])
@@ -150,11 +210,19 @@ def add_to_cart(pid):
             "id": pid,
             "name": product["name"],
             "price": product["price"],
-            "qty": qty
+            "qty": qty,
+            "image": product["image"]
         })
 
     session["cart"] = cart
     return redirect("/")
+
+
+# ---------------- CART ----------------
+
+@app.route("/")
+def home():
+    return render_template("cart.html", cart=session.get("cart", []))
 
 
 # ---------------- EXPORT EXCEL ----------------
@@ -163,18 +231,38 @@ def add_to_cart(pid):
 def export_excel():
     cart = session.get("cart", [])
 
+    conn = get_db()
+    cur = conn.cursor()
+
     data = []
+
     for item in cart:
+        total = item["price"] * item["qty"]
+
         data.append({
             "Product Name": item["name"],
             "Price": item["price"],
             "Quantity": item["qty"],
-            "Total": item["price"] * item["qty"]
+            "Total": total
         })
 
+        # 🔥 REDUCE STOCK HERE
+        cur.execute(
+            "UPDATE products SET stock = stock - %s WHERE id = %s",
+            (item["qty"], item["id"])
+        )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    # Create Excel
     df = pd.DataFrame(data)
     file = "bill.xlsx"
     df.to_excel(file, index=False)
+
+    # Clear cart after purchase
+    session["cart"] = []
 
     return send_file(file, as_attachment=True)
 
@@ -187,21 +275,8 @@ def clear():
     return redirect("/")
 
 
-# ---------------- GENERATE QR ----------------
-
-@app.route("/generate_qr/<int:pid>")
-def generate_qr(pid):
-    base_url = request.host_url.rstrip("/")
-    url = f"{base_url}/product/{pid}"
-
-    img = qrcode.make(url)
-    img.save(f"static/qr_codes/product_{pid}.png")
-
-    return "QR created!"
-
-
 # ---------------- RUN ----------------
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port)

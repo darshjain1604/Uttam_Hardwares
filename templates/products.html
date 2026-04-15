@@ -1,82 +1,148 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Products</title>
+  <title>Admin Products</title>
 
   <style>
     body {
       font-family: Arial;
-      background: #f4f6f9;
+      background: #eef2f7;
     }
 
     h1 {
       text-align: center;
+      margin-top: 20px;
     }
 
+    .top {
+      text-align: center;
+      margin: 20px;
+    }
+
+    input {
+      padding: 10px;
+      width: 250px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    .btn {
+      padding: 10px 15px;
+      margin: 5px;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+    }
+
+    .add { background: green; }
+    .logout { background: red; }
+
     .container {
-      width: 80%;
-      margin: auto;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
     }
 
     .card {
       background: white;
-      padding: 15px;
+      width: 250px;
       margin: 15px;
-      border-radius: 10px;
-      box-shadow: 0px 0px 8px rgba(0,0,0,0.1);
-      display: flex;
-      align-items: center;
-      gap: 15px;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+      text-align: center;
     }
 
     img {
-      width: 80px;
-      height: 80px;
+      width: 120px;
+      height: 120px;
       object-fit: cover;
-      border-radius: 8px;
+      border-radius: 10px;
     }
 
-    .info {
-      flex: 1;
+    .stock {
+      font-weight: bold;
+      margin-top: 5px;
     }
 
-    a {
-      text-decoration: none;
-      color: blue;
+    .low {
+      color: orange;
+    }
+
+    .out {
+      color: red;
     }
   </style>
+
+  <script>
+    function searchProducts() {
+      let input = document.getElementById("search").value.toLowerCase();
+      let cards = document.getElementsByClassName("card");
+
+      for (let i = 0; i < cards.length; i++) {
+        let name = cards[i].getElementsByTagName("h3")[0].innerText.toLowerCase();
+
+        if (name.includes(input)) {
+          cards[i].style.display = "block";
+        } else {
+          cards[i].style.display = "none";
+        }
+      }
+    }
+  </script>
+
 </head>
 
 <body>
 
-<h1>📦 All Products</h1>
+<h1>📦 Admin Product Dashboard</h1>
+
+<div class="top">
+
+  <!-- SEARCH -->
+  <input type="text" id="search" onkeyup="searchProducts()" placeholder="🔍 Search product...">
+
+  <br><br>
+
+  <!-- BUTTONS -->
+  <a href="/add_product"><button class="btn add">➕ Add Product</button></a>
+  <a href="/logout"><button class="btn logout">Logout</button></a>
+
+</div>
 
 <div class="container">
 
-{% if products %}
-  {% for p in products %}
-    <div class="card">
+{% for p in products %}
+  <div class="card">
 
-      <!-- Product Image -->
-      {% if p.image %}
-        <img src="{{ p.image }}">
-      {% else %}
-        <img src="https://via.placeholder.com/80">
-      {% endif %}
+    <!-- IMAGE -->
+    {% if p.image %}
+      <img src="{{ p.image }}">
+    {% else %}
+      <img src="https://via.placeholder.com/120">
+    {% endif %}
 
-      <div class="info">
-        <h3>{{ p.name }}</h3>
-        <p>Price: ₹{{ p.price }}</p>
-        <p>Unit: {{ p.unit }}</p>
+    <!-- NAME -->
+    <h3>{{ p.name }}</h3>
 
-        <a href="/product/{{ p.id }}">View Product</a>
-      </div>
+    <!-- PRICE -->
+    <p>₹{{ p.price }}</p>
 
-    </div>
-  {% endfor %}
-{% else %}
-  <p style="text-align:center;">No products available</p>
-{% endif %}
+    <!-- UNIT -->
+    <p>{{ p.unit }}</p>
+
+    <!-- STOCK STATUS -->
+    {% if p.stock <= 0 %}
+      <p class="stock out">Out of Stock ❌</p>
+    {% elif p.stock <= 5 %}
+      <p class="stock low">Low Stock ⚠ ({{ p.stock }})</p>
+    {% else %}
+      <p class="stock">Stock: {{ p.stock }}</p>
+    {% endif %}
+
+  </div>
+{% endfor %}
 
 </div>
 
