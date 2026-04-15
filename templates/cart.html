@@ -1,24 +1,154 @@
-<h1>Cart</h1>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cart</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #f4f6f9;
+    }
+
+    h1 {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    table {
+      width: 85%;
+      margin: 30px auto;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+    }
+
+    th {
+      background: #2c3e50;
+      color: white;
+      padding: 12px;
+    }
+
+    td {
+      padding: 12px;
+      text-align: center;
+      border-bottom: 1px solid #ddd;
+    }
+
+    img {
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 6px;
+    }
+
+    .total-box {
+      text-align: center;
+      font-size: 22px;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+
+    .buttons {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    button {
+      padding: 12px 25px;
+      margin: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      color: white;
+    }
+
+    .done {
+      background: green;
+    }
+
+    .clear {
+      background: red;
+    }
+
+    .empty {
+      text-align: center;
+      font-size: 18px;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🛒 Your Cart</h1>
 
 {% if cart %}
-<table border="1">
-<tr>
-<th>Name</th><th>Qty</th><th>Total</th>
-</tr>
 
-{% for item in cart %}
-<tr>
-<td>{{ item.name }}</td>
-<td>{{ item.qty }}</td>
-<td>{{ item.price * item.qty }}</td>
-</tr>
-{% endfor %}
+<table>
+  <tr>
+    <th>Image</th>
+    <th>Product</th>
+    <th>Price</th>
+    <th>Quantity</th>
+    <th>Total</th>
+  </tr>
+
+  {% set grand_total = 0 %}
+
+  {% for item in cart %}
+  <tr>
+
+    <!-- IMAGE -->
+    <td>
+      {% if item.image %}
+        <img src="{{ item.image }}">
+      {% else %}
+        <img src="https://via.placeholder.com/60">
+      {% endif %}
+    </td>
+
+    <!-- NAME -->
+    <td>{{ item.name }}</td>
+
+    <!-- PRICE -->
+    <td>₹{{ item.price }}</td>
+
+    <!-- QUANTITY -->
+    <td>{{ item.qty }}</td>
+
+    <!-- TOTAL -->
+    <td>₹{{ item.price * item.qty }}</td>
+
+  </tr>
+
+  {% set grand_total = grand_total + (item.price * item.qty) %}
+  {% endfor %}
 </table>
 
-<br>
-<a href="/export_excel"><button>DONE</button></a>
-<a href="/clear"><button>Clear</button></a>
+<div class="total-box">
+  Grand Total: ₹{{ grand_total }}
+</div>
+
+<div class="buttons">
+
+  <a href="/export_excel">
+    <button class="done">✅ DONE (Export to Excel)</button>
+  </a>
+
+  <a href="/clear">
+    <button class="clear">❌ Clear Cart</button>
+  </a>
+
+</div>
 
 {% else %}
-<p>Cart is empty</p>
+
+<p class="empty">Cart is empty 🛒</p>
+
 {% endif %}
+
+</body>
+</html>

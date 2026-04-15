@@ -2,24 +2,83 @@
 <html>
 <head>
   <title>Products</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #f4f6f9;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    .container {
+      width: 80%;
+      margin: auto;
+    }
+
+    .card {
+      background: white;
+      padding: 15px;
+      margin: 15px;
+      border-radius: 10px;
+      box-shadow: 0px 0px 8px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    img {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+
+    .info {
+      flex: 1;
+    }
+
+    a {
+      text-decoration: none;
+      color: blue;
+    }
+  </style>
 </head>
+
 <body>
 
-<h1>All Products</h1>
+<h1>📦 All Products</h1>
+
+<div class="container">
 
 {% if products %}
   {% for p in products %}
-    <div>
-      <h3>{{ p.name }}</h3>
-      <p>Price: ₹{{ p.price }}</p>
-      <p>Unit: {{ p.unit }}</p>
-      <a href="/product/{{ p.id }}">View</a>
+    <div class="card">
+
+      <!-- Product Image -->
+      {% if p.image %}
+        <img src="{{ p.image }}">
+      {% else %}
+        <img src="https://via.placeholder.com/80">
+      {% endif %}
+
+      <div class="info">
+        <h3>{{ p.name }}</h3>
+        <p>Price: ₹{{ p.price }}</p>
+        <p>Unit: {{ p.unit }}</p>
+
+        <a href="/product/{{ p.id }}">View Product</a>
+      </div>
+
     </div>
-    <hr>
   {% endfor %}
 {% else %}
-  <p>No products available</p>
+  <p style="text-align:center;">No products available</p>
 {% endif %}
+
+</div>
 
 </body>
 </html>
