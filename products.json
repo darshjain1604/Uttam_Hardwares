@@ -1,0 +1,14 @@
+[
+  {
+    "id": 101,
+    "name": "Steel Nails 2 inch",
+    "price": 120,
+    "unit": "box"
+  },
+  {
+    "id": 102,
+    "name": "PVC Pipe 1 inch",
+    "price": 250,
+    "unit": "piece"
+  }
+]
