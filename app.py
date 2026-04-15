@@ -72,4 +72,22 @@ def clear():
     return redirect("/")
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0")
+    app.run(host="0.0.0.0", port=5000)
+@app.route("/add_product", methods=["GET", "POST"])
+def add_product():
+    if request.method == "POST":
+        new_product = {
+            "id": int(request.form["id"]),
+            "name": request.form["name"],
+            "price": int(request.form["price"]),
+            "unit": request.form["unit"]
+        }
+
+        products.append(new_product)
+
+        with open("products.json", "w") as f:
+            json.dump(products, f, indent=4)
+
+        return "Product Added!"
+
+    return render_template("add_product.html")
